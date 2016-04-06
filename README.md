@@ -9,4 +9,4 @@ Library contents are as follows:
 
 - fillet_cube: An operator that fillets one or more edges of a cube. Edges can be configured all together, in groups (bottom edges, top edges and vertical edges), or singly. Each edge can have a different fillet radius. There is no requirement that the first child in the scope is actually a cube, so this module can be used to fillet edges on other shapes.
 
-- support_box: Makes a set of plates to support an overhang. Plates fill a cube and are by default colored red. All plates go across the shorter dimension but, if the plates are high enough, cross plates are added to stiffen the structure.
+- support_box: Makes a set of plates to support an overhang. All plates go across the shorter dimension but, if the plates are high enough, cross plates are added to stiffen the structure.

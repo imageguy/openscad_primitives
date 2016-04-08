@@ -1,3 +1,5 @@
+// Part of the openscad_primitives library
+
 // An operator that takes a cube and fillets the required edges with a given
 // radius. Edges to fillet can be selected in groups or singly.
 // Edges are grouped into bottom plane, top plane and vertical edges. Edges
@@ -7,7 +9,7 @@
 // order (cyan examples).
 
 // Call syntax: 
-// filleted_cube( dims, r, do, fn ) { }
+// fillet_cube( dims, r, do, fn ) { }
 // where
 // dims is 3 vector giving dimensions of the cube
 // r is the fillet radius
@@ -27,17 +29,17 @@
 // are filleted.
 
 // Examples using cube [20,30,40] and fillet radius 4:
-// filleted_cube( [20,30,40], 4 ) fillets all edges
-// filleted_cube( [20,30,40], 4, 0 ) fillets no edges
-// filleted_cube( [20,30,40], 4, 0,0,0 ) fillets no edges
-// filleted_cube( [20,30,40], 4, 0,0,1 ) fillets vertical edges only
-// filleted_cube( [20,30,40], 4, [[1,0,0,0], [1,0,0,0], [1,0,0,0]] ) fillets
+// fillet_cube( [20,30,40], 4 ) fillets all edges
+// fillet_cube( [20,30,40], 4, 0 ) fillets no edges
+// fillet_cube( [20,30,40], 4, 0,0,0 ) fillets no edges
+// fillet_cube( [20,30,40], 4, 0,0,1 ) fillets vertical edges only
+// fillet_cube( [20,30,40], 4, [[1,0,0,0], [1,0,0,0], [1,0,0,0]] ) fillets
 //   the X axis edge on the top and bottom plane and the origin verical edge
 // Example where each edge group has its own radius:
-// filleted_cube( [20,30,40], [ 2, 4, 6 ] ) 
+// fillet_cube( [20,30,40], [ 2, 4, 6 ] ) 
 // low edges have radius 2, edges have radius 4, vertical edges radius 6
 // Example where each group has its own radius:
-// filleted_cube( [40,60,80], [[2,4,6,8], [10,12,14,16], [18,20,22,24]] )
+// fillet_cube( [40,60,80], [[2,4,6,8], [10,12,14,16], [18,20,22,24]] )
 
 // There is no syntax checking. Any selector value not 1 is treated as 0.
 
@@ -157,7 +159,7 @@ module assemble_fillets_worker( dims, r, do, fn )
 }
 
 // worker
-module filleted_cube_worker( dims, r, do, fn ) 
+module fillet_cube_worker( dims, r, do, fn ) 
 {
 	difference() {
 		children( 0 ) ;
@@ -173,7 +175,7 @@ function parse_4( val ) = len(concat(val))==1 ?
 
 module parse_phase_1( dims, r, do, fn )
 {
-	filleted_cube_worker( dims,
+	fillet_cube_worker( dims,
 		[ parse_4(r[0]), parse_4(r[1]), parse_4(r[2]) ],
 		[ parse_4(do[0]), parse_4(do[1]), parse_4(do[2]) ], fn )
 		children(0) ;
@@ -192,7 +194,7 @@ color( "green" )
 translate( [ 30, 0, 0 ] )
 fillet_cube( [ 20, 30, 40 ], 4, 1, 50 ) 
 	cube( [20,30,40] ) ;
-// only edges at xyz axes are filleted fine resolution default used
+// only edges at xyz axes are filleted, fine resolution default used
 color( "blue" )
 translate( [ 60, 0, 0 ] )
 fillet_cube( [ 20, 30, 40 ], 4, [[1,1,0,0],[0,0,0,0], [1,0,0,0]] ) 

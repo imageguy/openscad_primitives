@@ -9,6 +9,6 @@ Library contents are as follows:
 
 - fillet_cube: An operator that fillets one or more edges of a cube. Edges can be configured all together, in groups (bottom edges, top edges and vertical edges), or singly. Each edge can have a different fillet radius. There is no requirement that the first child in the scope is actually a cube, so this module can be used to fillet edges on other shapes.
 
-- support_box: Makes a set of plates to support an overhang. All plates go across the shorter dimension but, if the plates are high enough, cross plates are added to stiffen the structure. Plates are perforated at the top by default for easier removal. If the object to be supported does not have a flat bottoma and perforations are desired, use the operator perf_support_surface in this file, instead of support_box.
-
-hinge - makes a hinge with specified number of elements. Also includes utility function to construct support plates if necessary. Default hinge values (5 outer radius, 2 inner radius) are suitable for a medium box and sturdy when printed in ABS with decent print quality.
+- support_box: Makes a set of plates to support an overhang. All plates go across the shorter dimension but, if the plates are high enough, cross plates are added to stiffen the structure. Plates are perforated at the top by default for easier removal. If the object to be supported does not have a flat bottom and perforations are desired, use the operator perf_support_surface in this file, instead of support_box.
+- hinge: Makes a hinge with specified number of elements. Also includes utility function to construct support plates if necessary. Default hinge values (5 outer radius, 2 inner radius) are suitable for a medium box and sturdy when printed in ABS with decent print quality.
+- cylinder_wedge: An operator that trims a given object to a wedge. 

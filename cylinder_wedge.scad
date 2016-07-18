@@ -1,4 +1,4 @@
-// Part of the openscad_primitves library
+// Part of the openscad_primitives library
 
 // Operator cylinder_wedge operator reduces an object to a wedge of a given
 // radius, angle and height. The outer edge can optionally be smoothed.
@@ -22,15 +22,13 @@
 // Algorithm gives a rectangular outer perimeter, which does not matter if
 // the object being trimmed is a cylinder or smaller than the given radius.
 // If the smooth_fn is nonzero, the child object is first intesected with a
-// cylinder of the wedge raius and height, with smooth_fn passed as the $fn
+// cylinder of the wedge radius and height, with smooth_fn passed as the $fn
 // to the cylinder call.
 // 
 // See examples on the bottom.
 
 // By Nenad Rijavec.
 // Feel free to use and modify as you see fit.
-
-// we use the rotated cube intersection trick to get wedges
 
 // operates on the first child
 module cylinder_wedge( r, h, start_angle, angle, smooth_fn=0 )

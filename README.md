@@ -11,4 +11,5 @@ Library contents are as follows:
 
 - support_box: Makes a set of plates to support an overhang. All plates go across the shorter dimension but, if the plates are high enough, cross plates are added to stiffen the structure. Plates are perforated at the top by default for easier removal. If the object to be supported does not have a flat bottom and perforations are desired, use the operator perf_support_surface in this file, instead of support_box.
 - hinge: Makes a hinge with specified number of elements. Also includes utility function to construct support plates if necessary. Default hinge values (5 outer radius, 2 inner radius) are suitable for a medium box and sturdy when printed in ABS with decent print quality.
-- cylinder_wedge: An operator that trims a given object to a wedge. 
+- cylinder_wedge: An operator that trims a given object to a wedge.
+- nut_holes: sundry hexagons that can be used to punch out holes for various nut sizes. Currently only has M3, M4 and M5.

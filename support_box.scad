@@ -11,7 +11,8 @@
 // copies of the object, so it's computationally much more intensive.
 
 // support_box makes a box at 0,0,0
-// The box is drawn so that the support plates are across shorter dimension.
+// The box is drawn so that the support plates are across shorter dimension,
+// but see the orient parameter below.
 // Defaults can changed by adding parameters to the call.
 
 // Call syntax:

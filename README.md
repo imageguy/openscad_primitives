@@ -13,3 +13,4 @@ Library contents are as follows:
 - hinge: Makes a hinge with specified number of elements. Also includes utility function to construct support plates if necessary. Default hinge values (5 outer radius, 2 inner radius) are suitable for a medium box and sturdy when printed in ABS with decent print quality.
 - cylinder_wedge: An operator that trims a given object to a wedge.
 - nut_holes: sundry hexagons that can be used to punch out holes for various nut sizes. Currently only has M3, M4 and M5.
+- polycube: automates building polyhedron from vertices, assuming the solid is "cube-like": 6 faces, 8 vertices, each face has 4 vertices. Vertices are specified in a 2x2x2 array in a hopefully intuitive fashion.

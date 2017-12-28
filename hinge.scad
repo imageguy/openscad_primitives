@@ -115,7 +115,9 @@ module support_hinge( height, len, gap, n_hinges,
 {
 	block_height = hinge_height( r_outer, max_height ) ;
 	nominal_height = hinge_height( r_outer,0 ) ;
-	supp_y = r_outer+offset + nominal_height - block_height ;
+	supp_y = r_outer+offset ; //+ nominal_height - block_height ;
+	// on QuBD, we used to support slope, but no longer need to do so
+	//supp_y = r_outer+offset + nominal_height - block_height ;
 	supp_z = height - block_height ;
 	for ( i= [1:n_hinges] )
 		translate( [ (i-1)*(len+gap), -r_outer-offset, 0 ] ) 

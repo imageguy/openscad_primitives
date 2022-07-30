@@ -15,3 +15,4 @@ Library contents are as follows:
 - cylinder_wedge: An operator that trims a given object to a wedge.
 - nut_holes: sundry hexagons that can be used to punch out holes for various nut sizes. Currently only has M3, M4 and M5.
 - polycube: automates building polyhedron from vertices, assuming the solid is "cube-like": 6 faces, 8 vertices, each face has 4 vertices. Vertices are specified in a 2x2x2 array in a hopefully intuitive fashion.
+- screw_thread: generates metric screw threads, in the sense that the thread geometry follows the standard for metric threads. Provides modules for making a screw segment, a nut core (nut thread thinly encased), hex bolt and hex nut.

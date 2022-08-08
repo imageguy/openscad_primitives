@@ -1,14 +1,16 @@
 /*
    A simple metric screw library. It builds metric screws in the sense that
    the thread geometry follows the metric standard. See
-   http://www.apollointernational.in/iso-metric-thread-chart.php for a
-   helpful diagram.
+   https://www.machiningdoctor.com/charts/metric-thread-charts/#c-mc
+   for an excellent explantaion of the metric thread geometry and
+   http://www.apollointernational.in/iso-metric-thread-chart.php for
+   the ISO thread size tolerance tables.
 
    openScad will generally not show the thread properly in preview. It will,
    however, show it fine after rendering, so you might prefix your constructs
    with the render() operator, or select Render (F6) in the user interface.
    
-   The library contains four modules:
+   The library contains five modules:
 
    screw_segment - builds a screw segment and contains all the thread logic.
 
@@ -20,6 +22,8 @@
 
    hex_nut - builds a hex nut.
 
+   wing_nut - builds a wing nut.
+
    To use the library, put this file in your search path (or in the folder
    where you are working) and put
    use <screw_threads.scad>
@@ -27,15 +31,20 @@
 
    If you run openScad on this file, it will build an example bolt and nut.
 
-   Each module takes three positional parameters and a number of optional
+   Each module takes two or three positional parameters and a number of optional
    named parameters. The positional parameters are the same as are used to
-   specify metric screw sizes: diameter, pitch and length, all in mm. Named
-   parameters refine and modify the screw shape as follows:
+   specify metric screw sizes: diameter, pitch and length, all in mm. the
+   length parameter is passed to screw and bolt modules only, nuts infer the
+   length from the hex_thickness parameter. We use named hex_thickness to
+   make it clear that it can be left out, in which case the thickness (and
+   the corresponding thread lenght) is computed automatically.
+   
+   Named parameters refine and modify the screw shape as follows:
 	
 	Common parameters:
 
 	fn = 50 : polyhedron segments per turn
-	radial_slop = +/-0.1 : nominal outer radius change (changes backlash)
+	diam_adj = +/-0.1 : nominal outer diameter change (changes backlash)
 			       negative for screw, positive for nut
 	trunc = -1 : how much to trim the outer peak. -1 : h/4
 	fill = -1 :  how much to fill the inner valley. -1 : h/8
@@ -51,7 +60,7 @@
 
 	thread_length = -1 : thread length in mm, -1 is equal to bolt length
 
-	hex_bolt and hex_nut:
+	hex_bolt, hex_nut and wing_nut:
 
 	hex_width = -1 : hex wrench size in mm, -1 for auto
 	hex_thickness = -1 :  head (or nut) thickness in mm, -1 for auto
@@ -59,16 +68,24 @@
    We assume the screw is built vertically, so "bottom" and "top" refer to
    the two screw ends.
 
-   Assuming the defaults are set properly, you should be able to just
-   specify the screw dimensions and be able to fit the resulting screw and
-   nut together. The example at the bottom of this file builds a M10-1.5x25
-   bolt and a corresponding nut.
+   We follow the ISO logic, where the outer screw diameter is to the outer
+   face, namely after the trim has been subtracted. You should be able to
+   leave trim and fill as defaults and only change diag_adj as needed. In
+   general, screws should be shrunk a little and bolts expanded a little, to
+   account for the fact thath the 3D prints are not as sharp as machined
+   metal.
 
-   Crucial parameters are radial_slop, trunc and fill and will depend on
-   your print quality. The defaults here are the standard metric screw
-   defaults and are almost certainly too tight for 3D printed objects. You
-   might try radial_slop of +/- 0.5mm and set trunc and fill to same value
-   in a similar range.
+   Run by itself, the code can produce bolt and nut combination for each of
+   the sizes M3, M4, M5, M6, M8 and M10. On my printer, using PLA, diam_adj
+   varies from -0.7 to -0.3 for bolts and stays at 0.3. for nuts. You may
+   have to change this depending on your screw size, print material and
+   print quality.
+
+   Set the true/false flags at the start of the code to select what to
+   render. By default, all sizes except M3 are built. M3 requires very good
+   print quality for the screw (nut is OK, but then even a blank cylinder of
+   proper size works as a M3 nut), and the screw is too spindly to be of
+   much use.
 
    Algorithm note: The thread spiral is built as a single polyhedron,
    defined as a sequence of vertical trapezes. Each trapeze base is trimmed
@@ -79,12 +96,26 @@
    I put no restrictions on this code. You are welcome to use, share and
    modify it as you see fit.
 */
+
+debug_echo = false ; // set to "true" to echo sizes in screw_segment
+
+// selects what to display as a test, see show_all module on the bottom
+do_m3 = false ;
+do_m4 = true ;
+do_m5 = true ;
+do_m6 = true ;
+do_m8 = true ;
+do_m10 = true ;
+showlist = [ do_m3, do_m4, do_m5, do_m6, do_m8, do_m10 ] ;
+n_show = len(showlist) ;
+
+// basic thread module, called by everything else
 module screw_segment( 
 	diam,   // outer nominal diameter
 	pitch,  // mm per turn
 	length, // in mm
 	fn = 50,  // polyhedron segments per turn
-	radial_slop = -0.1, // nominal outer radius change (changes backlash)
+	diam_adj = -0.1, // nominal diameter change (changes backlash)
 			    // negative for screw, positive for nut
 	trunc = -1, // how much to trim the outer peak. -1 : h/4
 	fill = -1,  // how much to fill the inner valley. -1: h/8
@@ -102,12 +133,22 @@ module screw_segment(
 	p_space = 0.01 ;
 	h_space = tan(angle) * p_space ;
 	h = cos(angle/2)*pitch ;
-	wtrunc = trunc==-1 ? h/4 : trunc ;
-	wfill = fill==-1 ? h/8 : fill ;
-	r = diam/2 - h + radial_slop ;
-	r_outer = r + h - wtrunc ;
+	wtrunc = trunc==-1 ? h/8 : trunc ;
+	wfill = fill==-1 ? h/4 : fill ;
+	hs = h - wtrunc - wfill ;
+	r = (diam + diam_adj)/2 - hs ;
+	r_outer = r + hs ;
+	if ( debug_echo ) {
+		echo( "diam", diam ) ;
+		echo( "diam_adj", diam_adj ) ;
+		echo( "r", r ) ;
+		echo( "r_outer", r_outer ) ;
+		echo( "h", h ) ;
+		echo( "wtrunc", wtrunc ) ;
+		echo( "wfill", wfill ) ;
+	}
 	trap_p = pitch*wtrunc/(2*h) ;
-	h_net = h - wtrunc ;
+	h_net = hs ;
 	degstep = 360/fn ;
 	step_up = pitch/fn ;
 	n = (length-pitch)*fn/pitch ;
@@ -122,17 +163,20 @@ module screw_segment(
 	// are ordered as necessary in face definitions
 	function oneslice(i) = [ 
 		// trapeze base, upper point
-		[r_eff(r,i)*cos(i*degstep)+h_space, 
-		r_eff(r,i)*sin(i*degstep)+h_space, 
+		[(r_eff(r,i)+h_space)*cos(i*degstep), 
+		(r_eff(r,i)+h_space)*sin(i*degstep), 
 		i*step_up+p_space ],
+
 		// trapeze base, lower point
-		[r_eff(r,i)*cos(i*degstep)+h_space,
-		r_eff(r,i)*sin(i*degstep)+h_space, 
+		[(r_eff(r,i)+h_space)*cos(i*degstep),
+		(r_eff(r,i)+h_space)*sin(i*degstep), 
 		i*step_up+pitch-p_space ],
+
 		// trapeze other parallel, upper point
 		[(r_eff(r_outer,i))*cos(i*degstep), 
 			(r_eff(r_outer,i))*sin(i*degstep),
 			i*step_up+trap_p+pitch/2],
+		
 		// trapeze other parallel, lower point
 		[(r_eff(r_outer,i))*cos(i*degstep),
 			(r_eff(r_outer,i))*sin(i*degstep),
@@ -198,7 +242,7 @@ module nut_core(
 	pitch,  // mm per turn
 	length, // in mm
 	fn = 50,  // polyhedron segments per turn
-	radial_slop = 0.1, // nominal outer radius change (changes backlash)
+	diam_adj = 0.1, // nominal diameter change (changes backlash)
 			    // negative for screw, positive for nut
 	trunc = -1, // how much to trim the outer peak. -1 : h/4
 	fill = -1,  // how much to fill the inner valley. -1: h/8
@@ -210,43 +254,47 @@ module nut_core(
 	angle = 60 ;
 	h = cos(angle/2)*pitch ;
 	difference() {
-		cylinder( length, d = diam+1+2*radial_slop, $fn = fn ) ;
+		cylinder( length, d = diam+1+diam_adj, $fn = fn ) ;
 		union() {
 			// thread
 			translate( [0, 0, -pitch ] )
 			screw_segment( diam, pitch, length+2*pitch,
-				radial_slop = radial_slop, 
+				diam_adj = diam_adj, 
 				// fill and trunc are interchanged,
 				// so have to handle defaults here
-				fill = (trunc==-1 ? h/4 : trunc),
-				trunc = (trunc==-1 ? h/4 : trunc),
+				fill = (trunc==-1 ? h/8 : trunc),
+				trunc = (fill==-1 ? h/4 : fill),
 				lead_top=false, lead_bottom=false,
 				chamfer_top = false, chamfer_bottom = false ) ;
 			if ( chamfer_top ) 
 				translate( [ 0, 0, length-pitch/2 ] )
-				cylinder( 0.1+pitch/2, d1 = diam-2*h,
-					d2 = diam, $fn = fn ) ;
+				cylinder( 0.1+pitch/2, d1 =
+				diam+diam_adj-2*h,
+					d2 = diam+diam_adj, $fn = fn ) ;
 			if ( chamfer_bottom ) 
 				translate( [ 0, 0, -0.1 ] )
-				cylinder( 0.1+pitch/2, d1 = diam,
-					d2 = diam-2*h, $fn = fn ) ;
+				cylinder( 0.1+pitch/2, d1 =
+				diam+diam_adj,
+					d2 = diam+diam_adj-2*h, $fn = fn ) ;
 		}
 	}
 }
 
+// following modules can be called to build bolts and nuts
+
 // utility functions
 // "hw" is the nominal wrench size in mm
 function hw(hex_width,diam) = (hex_width!=-1 ? hex_width :
-		(hex_width < 6 ? diam+2.5 :
-		(hex_width < 8 ? diam+4 :
-		(hex_width < 10 ? diam+5 : diam+7 ) ) ) ) ;
+		(diam < 6 ? diam+2.5 :
+		(diam < 8 ? diam+4 :
+		(diam < 10 ? diam+5 : diam+7 ) ) ) ) ;
 
 module hex_bolt( 
 	diam,   // outer nominal diameter
 	pitch,  // mm per turn
 	length, // total body length in mm
 	fn = 50,  // polyhedron segments per turn
-	radial_slop = -0.1, // nominal outer radius change (changes backlash)
+	diam_adj = -0.1, // nominal outer diameter change (changes backlash)
 			    // negative for screw, positive for nut
 	trunc = -1, // how much to trim the outer peak. -1 : h/4
 	fill = -1,  // how much to fill the inner valley. -1: h/8
@@ -280,7 +328,7 @@ module hex_bolt(
 			difference() {
 				cylinder( 2.1, d = hdiam+1, $fn = fn ) ;
 				translate( [ 0, 0, 0.01 ] )
-				cylinder( 2.02, d1 = 0.8*hdiam,
+				cylinder( 2.12, d1 = 0.8*hdiam,
 						d2 = hdiam+0.1,
 						$fn = fn ) ;
 			}
@@ -306,7 +354,7 @@ module hex_bolt(
 	// screw part, chamfered on top
 	translate( [ 0, 0, ht+blen-pitch/2-0.01 ] )
 	screw_segment( diam, pitch, (length-blen+pitch/2+0.01), fn = fn,
-	radial_slop = radial_slop,
+	diam_adj = diam_adj,
 	trunc = trunc,
 	fill = fill,
 	lead_top = true,
@@ -316,11 +364,11 @@ module hex_bolt(
 }
 
 module hex_nut( 
-	diam,   // outer nominal diameter
+	diam,   // inner nominal diameter
 	pitch,  // mm per turn
-	length, // total body length in mm
+	//length, // total body length in mm
 	fn = 50,  // polyhedron segments per turn
-	radial_slop = +0.1, // nominal outer radius change (changes backlash)
+	diam_adj = +0.1, // nominal outer diameter change (changes backlash)
 			    // negative for screw, positive for nut
 	trunc = -1, // how much to trim the outer peak. -1 : h/4
 	fill = -1,  // how much to fill the inner valley. -1: h/8
@@ -330,7 +378,7 @@ module hex_nut(
 {
 	// "hw" is the nominal wrench size in mm
 	// hdiam is the circle, slightly undersized
-	hdiam = hw( hex_width, diam+2*radial_slop ) / cos(30) - 0.5 ;
+	hdiam = hw( hex_width, diam ) / cos(30) - 0.5 ;
 	// thickness is oversized compared to standard metal dimensions,
 	// since plastic is softer
 	ht = hex_thickness!=-1 ? hex_thickness : 6 ;
@@ -340,7 +388,7 @@ module hex_nut(
 		union() {
 			// hole
 			translate( [ 0, 0, -1 ] )
-			cylinder( ht+2, d= diam+0.1, $fn=fn ) ;
+			cylinder( ht+2, d= diam+diam_adj+0.1, $fn=fn ) ;
 			// top head chamfer
 			translate( [ 0, 0, ht-1.99 ] )
 			difference() {
@@ -355,21 +403,142 @@ module hex_nut(
 			difference() {
 				cylinder( 2.1, d = hdiam+1, $fn = fn ) ;
 				translate( [ 0, 0, 0.01 ] )
-				cylinder( 2.02, d1 = 0.8*hdiam,
+				cylinder( 2.12, d1 = 0.8*hdiam,
 						d2 = hdiam+0.1,
 						$fn = fn ) ;
 			}
 		}
 	}
-	nut_core( diam, pitch, length,  fn = fn,
-	radial_slop = radial_slop,
-	trunc = trunc,
-	fill = fill,
-	chamfer_top = true, chamfer_bottom = true ) ;
+	nut_core( diam, pitch, ht,  fn = fn, diam_adj = diam_adj,
+		trunc = trunc, fill = fill,
+		chamfer_top = true, chamfer_bottom = true ) ;
 }
 
-render() hex_bolt( 10, 1.5, 25, thread_length = 15,
-	radial_slop = -0.4, trunc = 0.3, fill = 0.3 ) ;
-translate( [ 18, 0, 0 ] )
-render() hex_nut( 10, 1.5, 6, radial_slop = 0.4, trunc = 0.3, fill = 0.3 ) ;
+// builds a wing nut wing. Mirrored to get the other wing
+module wing( wdiam, ht, hdiam )
+{
+	wing_t = wdiam < 8 ? 4 : wdiam / 2 ;
+	wing_l = wdiam < 8 ? 12 : 1.5 * wdiam ;
+	wing_angle = 45 ;
+	difference() {
+		hull() union() {
+			translate( [ hdiam/2, 0, wing_t/2 ] )
+				sphere( d=wing_t, $fn=10 ) ;
+			translate( [ cos(wing_angle)*wing_l+hdiam/2, 0,
+					sin(wing_angle)*wing_l ] )
+				sphere( d=wing_t, $fn=10 ) ;
+			translate( [ hdiam/2-1, 0, ht-wing_t/2+1 ] )
+				sphere( d=wing_t, $fn=10 ) ;
+			translate( [ cos(wing_angle)*wing_l+hdiam/2-4, 0,
+					sin(wing_angle)*wing_l+2 ] )
+				sphere( d=wing_t, $fn=10 ) ;
+		}
+		// on smaller nuts, wing can protrude into the thread
+		// this takes care of it
+		translate( [ 0, 0, -5 ] )
+			cylinder( 3*ht, d=wdiam+0.5, $fn = 10 ) ;
+	}
 
+}
+
+// for consistency, we refer to "hex", even though the nut is round
+module wing_nut( 
+	diam,   // inner nominal diameter
+	pitch,  // mm per turn
+	fn = 50,  // polyhedron segments per turn
+	diam_adj = +0.1, // nominal outer diameter change (changes backlash)
+			    // negative for screw, positive for nut
+	trunc = -1, // how much to trim the outer peak. -1 : h/4
+	fill = -1,  // how much to fill the inner valley. -1: h/8
+	hex_width = -1, // hex wrench size in mm, -1 for auto
+	hex_thickness = -1 // head thickness in mm, -1 for auto
+	)
+{
+	wdiam = diam + diam_adj ;
+	hdiam = hw( hex_width, diam ) / cos(30) - 0.5 ;
+	// thickness is oversized compared to standard metal dimensions,
+	// since plastic is softer
+	ht = hex_thickness!=-1 ? hex_thickness : 6 ;
+	difference() {
+		scale( [ 1, 1, 3*ht/hdiam ] ) sphere( d = hdiam, $fn=fn  ) ;
+		union() {
+			translate( [ -2*hdiam, -2*hdiam, -2*hdiam ] )
+				cube( [ 4*hdiam,4*hdiam,2*hdiam] ) ;
+			translate( [ -2*hdiam, -2*hdiam, ht ] )
+				cube( [ 4*hdiam,4*hdiam,hdiam] ) ;
+			translate( [ 0, 0, -1 ] )
+			cylinder( 2*hdiam, d=wdiam, $fn = 50 ) ;
+		}
+	}
+	if( true )
+	nut_core( diam, pitch, ht,  fn = fn,
+		diam_adj = diam_adj,
+		trunc = trunc,
+		fill = fill,
+		chamfer_top = true, chamfer_bottom = true ) ;
+	wing( wdiam, ht, hdiam ) ;
+	mirror( [ 1, 0, 0 ] ) wing( wdiam, ht, hdiam ) ;
+}
+
+// for sizes M3, M4 M5, M6, M8 and M10, bolt and nut can be rendered.
+// set "true" on the top of the file for the sizes to be rendered.
+size = [ 10, 12, 14, 16, 20, 20 ] ; // y-space covered by each size
+// bolt parameters for each size
+// M3-M8 have the thread over the whole 15mm length
+// M10 has 15mm of thread over 25mm bolt length
+bolt_params = [
+	[ 3, 0.5,  15, -0.3, 30, -1,  5 ],
+	[ 4, 0.7,  15, -0.3, 50, -1,  5 ],
+	[ 5, 0.8,  15, -0.5, 50, -1,  5 ],
+	[ 6, 1.0,  15, -0.5, 50, -1, -1 ],
+	[ 8, 1.25, 15, -0.7, 50, -1, -1 ],
+	[10, 1.5,  25, -0.7, 50, 15, -1 ],
+] ;
+// nut parameters for each size
+nut_params = [
+	[ 3, 0.5,  0.3, 30,  5 ],
+	[ 4, 0.7,  0.3, 50,  5 ],
+	[ 5, 0.8,  0.3, 50,  5 ],
+	[ 6, 1.0,  0.3, 50, -1 ],
+	[ 8, 1.25, 0.3, 50, -1 ],
+	[10, 1.5,  0.3, 50,  8 ],
+] ;
+
+// recursive function, returns space used by previously rendered sizes
+function sizesum(i) = (i ==0) ? 0 : 
+	(showlist[i-1] ?  sizesum(i-1)+size[i-1] : sizesum(i-1)) ;
+
+// show all the selected bolt/nut sizes
+module show_all()
+{
+	render() union() for ( i = [ 1:n_show ] ) {
+		n = len( [ for( j=[0:n_show]) if (j<i && showlist[j] ) 1 ] ) ;
+		if( showlist[i-1] ) {
+			translate( [ 0, sizesum(i-1), 0 ] )
+			rotate( [ 0, 0, 30 ] )
+			hex_bolt( 
+				bolt_params[i-1][0],
+				bolt_params[i-1][1],
+				bolt_params[i-1][2],
+				diam_adj = bolt_params[i-1][3],
+				fn = bolt_params[i-1][4],
+				thread_length = bolt_params[i-1][5],
+				hex_thickness = bolt_params[i-1][6] ) ;
+			translate( [ 20, sizesum(i-1), 0 ] )
+			rotate( [ 0, 0, 30 ] )
+			hex_nut( 
+				nut_params[i-1][0],
+				nut_params[i-1][1],
+				diam_adj = nut_params[i-1][2],
+				fn = nut_params[i-1][3],
+				hex_thickness = nut_params[i-1][4] ) ;
+		} else
+			echo("no", bolt_params[i-1][0] ) ;
+	}
+}
+
+if ( true )
+show_all() ;
+else
+	// or build a wing nut
+	render() wing_nut( 10, 1.5, diam_adj = 0.3, hex_thickness = 8 ) ;

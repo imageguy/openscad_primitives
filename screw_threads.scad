@@ -2,9 +2,12 @@
    A simple metric screw library. It builds metric screws in the sense that
    the thread geometry follows the metric standard. See
    https://www.machiningdoctor.com/charts/metric-thread-charts/#c-mc
-   for an excellent explantaion of the metric thread geometry and
+   for an excellent explanation of the metric thread geometry and
    http://www.apollointernational.in/iso-metric-thread-chart.php for
    the ISO thread size tolerance tables.
+
+   Varying the angle parameter will produce threads outside of metric
+   standard.
 
    openScad will generally not show the thread properly in preview. It will,
    however, show it fine after rendering, so you might prefix your constructs
@@ -37,7 +40,7 @@
    length parameter is passed to screw and bolt modules only, nuts infer the
    length from the hex_thickness parameter. We use named hex_thickness to
    make it clear that it can be left out, in which case the thickness (and
-   the corresponding thread lenght) is computed automatically.
+   the corresponding thread length) is computed automatically.
    
    Named parameters refine and modify the screw shape as follows:
 	
@@ -48,6 +51,12 @@
 			       negative for screw, positive for nut
 	trunc = -1 : how much to trim the outer peak. -1 : h/4
 	fill = -1 :  how much to fill the inner valley. -1 : h/8
+	angle = 60 : thread cross-section triangle outer thread angle.
+				Metric threads have equilateral triangle
+				cross section before any trimming, so this
+				is 60 degrees. Smaller angles yield deeper
+				thread, larger angles yield shallower
+				thread.
 	chamfer_top = true : // chamfer the screw or nut on the top
 	chamfer_bottom = false : // chamfer the screw or nut on the bottom
 
@@ -117,6 +126,7 @@ module screw_segment(
 	fn = 50,  // polyhedron segments per turn
 	diam_adj = -0.1, // nominal diameter change (changes backlash)
 			    // negative for screw, positive for nut
+	angle = 60,  // outer thread cross-section angle, 60 is metric standard
 	trunc = -1, // how much to trim the outer peak. -1 : h/4
 	fill = -1,  // how much to fill the inner valley. -1: h/8
 	lead_top = true, // lead thread (recessing into interior) on the top
@@ -125,13 +135,12 @@ module screw_segment(
 	chamfer_bottom = false // chamfer the screw on the bottom
 	)
 {
-	//notation: "p" is in axial (pitch) direction, "h" is in radial (height)
-	//direction
-	angle = 60 ; // metric thread is equilateral triangle
+	//notation: "p" is in axial (pitch) direction, 
+	// "h" is in radial (height) direction
 	// trapeze is trimmed on the inside, so polyhedron points on
 	// adjacent threads don't coincide. 
-	p_space = 0.01 ;
-	h_space = tan(angle) * p_space ;
+	p_space = 0.001 ;
+	h_space = p_space * tan((180-angle)/2) ;
 	h = cos(angle/2)*pitch ;
 	wtrunc = trunc==-1 ? h/8 : trunc ;
 	wfill = fill==-1 ? h/4 : fill ;
@@ -146,6 +155,9 @@ module screw_segment(
 		echo( "h", h ) ;
 		echo( "wtrunc", wtrunc ) ;
 		echo( "wfill", wfill ) ;
+		echo( "a", angle, "tan", tan((180-angle)/2) ) ;
+		echo( "p_space", p_space ) ;
+		echo( "h_space", h_space ) ;
 	}
 	trap_p = pitch*wtrunc/(2*h) ;
 	h_net = hs ;
@@ -206,15 +218,16 @@ module screw_segment(
 	if ( chamfer_top || chamfer_bottom ) difference() {
 		union() {
 			polyhedron( vertices, faces ) ;
-			cylinder( length, r=r+(wfill>0.1?wfill:0.1), $fn=fn ) ;
+			cylinder( length, r=r+(wfill>0.001?wfill:0.001), $fn=fn ) ;
 		}
 		union() {
 			if ( chamfer_top ) {
 				hh = length - vertices[n_vert-2][2] ;
+				//hh = pitch/4 ;
 				translate( [0, 0, vertices[n_vert-2][2] ] ) 
 				difference() {
 					cylinder( hh+1, r=r_outer+1, $fn=fn ) ;
-					cylinder( hh, r1=r_c(n_vert-1)+wfill, 
+					cylinder( pitch/4, r1=r_c(n_vert-1)+wfill, 
 						r2 = r_c(n_vert-3), $fn = fn) ;
 				}
 			}
@@ -244,6 +257,7 @@ module nut_core(
 	fn = 50,  // polyhedron segments per turn
 	diam_adj = 0.1, // nominal diameter change (changes backlash)
 			    // negative for screw, positive for nut
+	angle = 60,  // outer thread cross-section angle, 60 is metric standard
 	trunc = -1, // how much to trim the outer peak. -1 : h/4
 	fill = -1,  // how much to fill the inner valley. -1: h/8
 	chamfer_top = true, // chamfer the nut on the top
@@ -251,7 +265,6 @@ module nut_core(
 	)
 {
 	// no leads or chamfer on the screw used for diff
-	angle = 60 ;
 	h = cos(angle/2)*pitch ;
 	difference() {
 		cylinder( length, d = diam+1+diam_adj, $fn = fn ) ;
@@ -260,6 +273,7 @@ module nut_core(
 			translate( [0, 0, -pitch ] )
 			screw_segment( diam, pitch, length+2*pitch,
 				diam_adj = diam_adj, 
+				angle = angle,
 				// fill and trunc are interchanged,
 				// so have to handle defaults here
 				fill = (trunc==-1 ? h/8 : trunc),
@@ -296,6 +310,7 @@ module hex_bolt(
 	fn = 50,  // polyhedron segments per turn
 	diam_adj = -0.1, // nominal outer diameter change (changes backlash)
 			    // negative for screw, positive for nut
+	angle = 60,  // outer thread cross-section angle, 60 is metric standard
 	trunc = -1, // how much to trim the outer peak. -1 : h/4
 	fill = -1,  // how much to fill the inner valley. -1: h/8
 	thread_length = -1, // thread length in mm, -1 is equal to length
@@ -309,26 +324,28 @@ module hex_bolt(
 	hdiam = hw( hex_width,diam ) / cos(30) - 0.5 ;
 	// thickness is oversized compared to standard metal dimensions,
 	// since plastic is softer
-	ht = hex_thickness!=-1 ? hex_thickness : 6 ;
+	ht = hex_thickness!=-1 ? hex_thickness : 
+		(diam < 6 ? 4 : 3 * diam / 4) ;
 	// head is chamfered slightly
 	difference() {
 		cylinder( ht, d=hdiam, $fn = 6 ) ;
 		union() {
+			f = 0.55 ;
 			// top head chamfer
-			translate( [ 0, 0, ht-1.99 ] )
+			translate( [ 0, 0, 0.70*ht ] )
 			difference() {
-				cylinder( 2.5, d = hdiam+1, $fn = fn ) ;
+				cylinder( f*ht, d = hdiam+1, $fn = fn ) ;
 				translate( [ 0, 0, -0.01 ] )
-				cylinder( 2.02, d1 = hdiam+0.1,
+				cylinder( f*ht+0.02, d1 = hdiam+0.1,
 						d2 = 0.8*hdiam,
 						$fn = fn ) ;
 			}
 			// bottom head chamfer
-			translate( [ 0, 0, -0.01 ] )
+			translate( [ 0, 0, (0.3-f)*ht ] )
 			difference() {
-				cylinder( 2.1, d = hdiam+1, $fn = fn ) ;
-				translate( [ 0, 0, 0.01 ] )
-				cylinder( 2.12, d1 = 0.8*hdiam,
+				cylinder( f*ht, d = hdiam+1, $fn = fn ) ;
+				translate( [ 0, 0, 0.001 ] )
+				cylinder( f*ht+0.012, d1 = 0.8*hdiam,
 						d2 = hdiam+0.1,
 						$fn = fn ) ;
 			}
@@ -355,6 +372,7 @@ module hex_bolt(
 	translate( [ 0, 0, ht+blen-pitch/2-0.01 ] )
 	screw_segment( diam, pitch, (length-blen+pitch/2+0.01), fn = fn,
 	diam_adj = diam_adj,
+	angle = angle,
 	trunc = trunc,
 	fill = fill,
 	lead_top = true,
@@ -370,6 +388,7 @@ module hex_nut(
 	fn = 50,  // polyhedron segments per turn
 	diam_adj = +0.1, // nominal outer diameter change (changes backlash)
 			    // negative for screw, positive for nut
+	angle = 60,  // outer thread cross-section angle, 60 is metric standard
 	trunc = -1, // how much to trim the outer peak. -1 : h/4
 	fill = -1,  // how much to fill the inner valley. -1: h/8
 	hex_width = -1, // hex wrench size in mm, -1 for auto
@@ -381,36 +400,35 @@ module hex_nut(
 	hdiam = hw( hex_width, diam ) / cos(30) - 0.5 ;
 	// thickness is oversized compared to standard metal dimensions,
 	// since plastic is softer
-	ht = hex_thickness!=-1 ? hex_thickness : 6 ;
+	ht = hex_thickness!=-1 ? hex_thickness : 
+		(diam < 6 ? 4 : 3 * diam / 4) ;
 	// nut is chamfered slightly
 	difference() {
 		cylinder( ht, d=hdiam, $fn = 6 ) ;
 		union() {
-			// hole
-			translate( [ 0, 0, -1 ] )
-			cylinder( ht+2, d= diam+diam_adj+0.1, $fn=fn ) ;
+			f = 0.55 ;
 			// top head chamfer
-			translate( [ 0, 0, ht-1.99 ] )
+			translate( [ 0, 0, 0.70*ht ] )
 			difference() {
 				cylinder( 2.5, d = hdiam+1, $fn = fn ) ;
 				translate( [ 0, 0, -0.01 ] )
-				cylinder( 2.02, d1 = hdiam+0.1,
+				cylinder( f*ht+0.02, d1 = hdiam+0.1,
 						d2 = 0.8*hdiam,
 						$fn = fn ) ;
 			}
 			// bottom head chamfer
 			translate( [ 0, 0, -0.01 ] )
 			difference() {
-				cylinder( 2.1, d = hdiam+1, $fn = fn ) ;
+				cylinder( f*ht+0.1, d = hdiam+1, $fn = fn ) ;
 				translate( [ 0, 0, 0.01 ] )
-				cylinder( 2.12, d1 = 0.8*hdiam,
+				cylinder( f*ht+0.12, d1 = 0.8*hdiam,
 						d2 = hdiam+0.1,
 						$fn = fn ) ;
 			}
 		}
 	}
 	nut_core( diam, pitch, ht,  fn = fn, diam_adj = diam_adj,
-		trunc = trunc, fill = fill,
+		angle = angle, trunc = trunc, fill = fill,
 		chamfer_top = true, chamfer_bottom = true ) ;
 }
 
@@ -448,6 +466,7 @@ module wing_nut(
 	fn = 50,  // polyhedron segments per turn
 	diam_adj = +0.1, // nominal outer diameter change (changes backlash)
 			    // negative for screw, positive for nut
+	angle = 60,
 	trunc = -1, // how much to trim the outer peak. -1 : h/4
 	fill = -1,  // how much to fill the inner valley. -1: h/8
 	hex_width = -1, // hex wrench size in mm, -1 for auto
@@ -455,7 +474,7 @@ module wing_nut(
 	)
 {
 	wdiam = diam + diam_adj ;
-	hdiam = hw( hex_width, diam ) / cos(30) - 0.5 ;
+	hdiam = hw( hex_width, diam ) / cos(angle/2) - 0.5 ;
 	// thickness is oversized compared to standard metal dimensions,
 	// since plastic is softer
 	ht = hex_thickness!=-1 ? hex_thickness : 6 ;
@@ -473,6 +492,7 @@ module wing_nut(
 	if( true )
 	nut_core( diam, pitch, ht,  fn = fn,
 		diam_adj = diam_adj,
+		angle = angle,
 		trunc = trunc,
 		fill = fill,
 		chamfer_top = true, chamfer_bottom = true ) ;

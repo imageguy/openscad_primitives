@@ -406,22 +406,24 @@ module hex_nut(
 	difference() {
 		cylinder( ht, d=hdiam, $fn = 6 ) ;
 		union() {
+			translate( [ 0, 0, -1 ] )
+				cylinder(  ht+2, d=diam+1, $fn=50) ;
 			f = 0.55 ;
 			// top head chamfer
 			translate( [ 0, 0, 0.70*ht ] )
 			difference() {
-				cylinder( 2.5, d = hdiam+1, $fn = fn ) ;
+				cylinder( f*ht, d = hdiam+1, $fn = fn ) ;
 				translate( [ 0, 0, -0.01 ] )
 				cylinder( f*ht+0.02, d1 = hdiam+0.1,
 						d2 = 0.8*hdiam,
 						$fn = fn ) ;
 			}
 			// bottom head chamfer
-			translate( [ 0, 0, -0.01 ] )
+			translate( [ 0, 0, (0.3-f)*ht ] )
 			difference() {
-				cylinder( f*ht+0.1, d = hdiam+1, $fn = fn ) ;
-				translate( [ 0, 0, 0.01 ] )
-				cylinder( f*ht+0.12, d1 = 0.8*hdiam,
+				cylinder( f*ht, d = hdiam+1, $fn = fn ) ;
+				translate( [ 0, 0, 0.001 ] )
+				cylinder( f*ht+0.012, d1 = 0.8*hdiam,
 						d2 = hdiam+0.1,
 						$fn = fn ) ;
 			}
